@@ -1,0 +1,33 @@
+Git Hub Url:
+https://github.com/sri2456/orange-fox-ci-cd/new/main
+
+Setup the app
+•	Install PM2 from NPM, which will help in deploying the app:
+npm install pm2 -g
+•	Run the following command in a terminal window to setup the app:
+npm install
+
+Run Unit Testing
+•	Run the following command in the terminal window to run the test.
+npm test
+•	The above command should display the execution of 1 Spec and 0 Failures.
+
+
+Deploy the app
+•	Command to deploy the app in Development environment:
+pm2 start dev.config.js
+•	To check if the app is running, access https://localhost:3000 in the browser.
+•	Sample layout of the launched page.
+
+•	Command to deploy the app in Test environment:
+pm2 start test.config.js
+•	To check if the app is running, access https://localhost:4000 in the browser.
+•	Command to deploy the app in Production environment:
+pm2 start prod.config.js
+•	To check if the app is running, access https://localhost:5000 in the browser.
+•	Command to restart the app in Development environment if it is already running:
+pm2 restart dev.config.js
+•	Command to restart the app in Test environment if it is already running:
+pm2 restart test.config.js
+•	Command to restart the app in Production environment if it is already running:
+pm2 restart prod.config.js

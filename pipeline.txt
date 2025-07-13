@@ -1,0 +1,124 @@
+pipeline {
+    agent any
+    
+    parameters {
+        choice(name: 'ENV', choices: ['dev', 'test', 'prod'], description: 'Choose environment to deploy')
+    }
+
+    environment {
+		BASE_DIR = "${WORKSPACE}\\.jenkins\\app-deploy"
+        SRC_DIR = "${WORKSPACE}\\src"
+        REPO_URL = 'https://github.com/sri2456/orange-fox-ci-cd.git' // Replace with your GitHub repo
+        APP_NAME = "myapp-${params.ENV}"
+        DEPLOY_DIR = "deploy/${params.ENV}"
+        SOURCE_DIR = "apps/myapp/"
+        HOME= "C:\\Users\\sree"
+    }
+
+    stages {
+	        
+        stage('Check PM2') {
+            steps {
+                script {
+                    def pm2Cmd = 'C:\\Users\\sree\\AppData\\Roaming\\npm\\pm2.cmd'
+                    bat "\"${pm2Cmd}\" -v"
+                }
+            }
+        }
+    
+        stage('Checkout using PAT') {
+            steps {
+                withCredentials([string(credentialsId: 'github-token', variable: 'TOKEN')]) {
+                    script {
+                        def repoWithToken = "https://sri2456:${TOKEN}@github.com/sri2456/orange-fox-ci-cd.git"
+                        git  branch: 'main', url: repoWithToken
+                    }
+                }
+            }
+        }
+
+        stage('Create Deployment Folders') {
+            steps {
+                script {
+                    ['dev', 'test', 'prod'].each { envName ->
+                        def dirPath = "${BASE_DIR}\\${envName}"
+                        bat "rmdir /s /q ${BASE_DIR}\\${envName}"
+                        bat "mkdir ${dirPath}"
+                    }
+                }
+            }
+        }
+
+        stage('Test') {
+            steps {
+                script {
+                    echo "🔍 Running unit tests..."
+                    def output = bat(script: 'npm test', returnStdout: true).trim()
+                    echo output
+
+                    if (output.contains('1 spec') && output.contains('0 failures')) {
+                        echo '✅ Test passed: 1 Spec, 0 Failures'
+                    } else {
+                        error('❌ Test failed or did not run as expected')
+                    }
+                }
+            }
+        }
+		
+        stage('Prepare Deploy Directory') {
+            steps {
+                script {
+                    echo "Copying files to ${env.DEPLOY_DIR}"
+                     ['dev', 'test', 'prod'].each { envName ->
+                        def dirPath = "${BASE_DIR}\\${envName}"
+                        bat "rmdir /s /q ${BASE_DIR}\\${envName}"
+                        bat "mkdir ${dirPath}"
+                          def devPath = "${BASE_DIR}\\${envName}"
+                        bat "xcopy /E /I /Y ${SRC_DIR} ${devPath}"
+                    }
+                }
+            }
+        }
+         stage('Deploy the App with PM2') {
+            steps {
+                script {
+                    dir("${env.DEPLOY_DIR}") {
+                        echo "Checking if ${env.APP_NAME} is already running..."
+                        bat """
+                            pm2 list | findstr /C:"${env.APP_NAME}"
+                            if %ERRORLEVEL% EQU 0 (
+                                echo App is running. Restarting...
+                                pm2 delete "${env.APP_NAME}"
+                            ) else (
+                                echo App is not running. Starting...
+                            )
+                            cd ..
+                            cd ..
+                            pm2 start ${params.ENV}.config.js
+                        """
+                    }
+                }
+            }
+        }
+        
+        stage('App URL') {
+            steps {
+                script {
+                    def urlMap = [
+                        dev:  "http://localhost:3000",
+                        test: "http://localhost:4000",
+                        prod: "http://localhost:5000"
+                    ]
+                    echo "App deployed at: ${urlMap[params.ENV]}"
+                }
+            }
+        }
+    }
+
+    post {
+        always {
+            echo "PM2 process list:"
+            bat "pm2 ls"
+        }
+    }
+}
